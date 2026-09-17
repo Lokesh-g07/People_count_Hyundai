@@ -45,6 +45,7 @@ import ipaddress
 from urllib.parse import urlparse
 from pathlib import Path
 import aiosqlite
+from contextlib import asynccontextmanager
 
 import jwt
 import uvicorn
@@ -122,7 +123,12 @@ else:
         logger.warning("⚠  Using default JWT secret in development mode.")
 
 # ── App ──────────────────────────────────────────────────────────────────────
-app = FastAPI(title="Factory Eye — People Counter API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await db.init_db()
+    yield
+
+app = FastAPI(title="Factory Eye — People Counter API", lifespan=lifespan)
 
 # ── CORS (locked down) ──────────────────────────────────────────────────────
 app.add_middleware(
@@ -136,11 +142,23 @@ app.add_middleware(
 # ── Static files ─────────────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
-# ── Startup: init DB ─────────────────────────────────────────────────────────
-@app.on_event("startup")
-async def startup():
-    await db.init_db()
+# ── Auth Rate Limiter ────────────────────────────────────────────────────────
+AUTH_RATE_LIMIT_MINS = int(os.environ.get("FACTORY_EYE_AUTH_RL_MINS", "10"))
+AUTH_RATE_LIMIT_ATTEMPTS = int(os.environ.get("FACTORY_EYE_AUTH_RL_ATTEMPTS", "5"))
+_auth_attempts = {}
 
+def _check_auth_rate_limit(ip: str):
+    now = time.time()
+    cutoff = now - (AUTH_RATE_LIMIT_MINS * 60)
+    attempts = _auth_attempts.get(ip, [])
+    attempts = [t for t in attempts if t > cutoff]
+    
+    if len(attempts) >= AUTH_RATE_LIMIT_ATTEMPTS:
+        _auth_attempts[ip] = attempts
+        raise HTTPException(status_code=429, detail="Too many authentication attempts. Please try again later.")
+        
+    attempts.append(now)
+    _auth_attempts[ip] = attempts
 
 # ── JWT helpers ──────────────────────────────────────────────────────────────
 def create_token(subject: str = "user") -> str:
@@ -175,11 +193,14 @@ async def require_auth(request: Request) -> dict:
 
 # ── Auth endpoint ────────────────────────────────────────────────────────────
 @app.post("/api/token")
-async def get_token(body: dict, response: Response):
+async def get_token(body: dict, request: Request, response: Response):
     """
     Exchange an API key for a JWT.
     Body: { "api_key": "<key>" }
     """
+    ip = request.client.host if request.client else "unknown"
+    _check_auth_rate_limit(ip)
+    
     if body.get("api_key") != API_KEY:
         raise HTTPException(status_code=403, detail="Invalid API key")
     token = create_token()
@@ -204,11 +225,8 @@ async def logout(response: Response):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     fe = Path("frontend/index.html")
-    fallback = Path("index.html")
     if fe.exists() and fe.stat().st_size > 0:
         return fe.read_text(encoding="utf-8")
-    if fallback.exists():
-        return fallback.read_text(encoding="utf-8")
     return "<h1>Factory Eye</h1><p>frontend/index.html not found</p>"
 
 
@@ -676,8 +694,9 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.error(f"WebSocket error: {e}")
     finally:
         streaming = False
-        if frame_task:
+        if frame_task and not frame_task.done():
             frame_task.cancel()
+        counter.stop()  # Ensure resources are released on abrupt disconnect
 
         # Persist final session stats to DB if it started
         if has_started:

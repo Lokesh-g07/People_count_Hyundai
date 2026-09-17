@@ -21,6 +21,7 @@ import io
 import logging
 import time
 from typing import Callable
+import threading
 
 import cv2
 import numpy as np
@@ -72,6 +73,7 @@ class PeopleCounter:
                 f"Permitted models: {', '.join(sorted(ALLOWED_MODELS))}"
             )
 
+        self._lock = threading.Lock()
         self.model_path = model_path
         self.conf = conf
         self.max_capacity = max_capacity
@@ -140,7 +142,7 @@ class PeopleCounter:
             self._is_running = True
             self._reset_counts()
             self.session_start = time.time()
-            self._reconnect_attempts = 0
+            # self._reconnect_attempts is reset on successful read in get_frame
             logger.info(f"Opened source {self._source}  {self.frame_width}x{self.frame_height}")
             return True
         except Exception as e:
@@ -179,8 +181,10 @@ class PeopleCounter:
                 f"Permitted models: {', '.join(sorted(ALLOWED_MODELS))}"
             )
         try:
-            self.model = YOLO(model_path)
-            self.model_path = model_path
+            new_model = YOLO(model_path)
+            with self._lock:
+                self.model = new_model
+                self.model_path = model_path
             logger.info(f"Model switched to {model_path}")
         except Exception as e:
             logger.error(f"Failed to load model {model_path}: {e}")
@@ -247,6 +251,7 @@ class PeopleCounter:
                     self._is_running = False
                     return None
             else:
+                self._reconnect_attempts = 0 # Reset attempts after a successful read
                 break # Got a frame successfully
 
         if not ret or frame is None:
@@ -256,15 +261,16 @@ class PeopleCounter:
         now = time.time()
 
         # --- YOLO tracking — person class only (class 0 in COCO) ---
-        results = self.model.track(
-            frame,
-            persist=True,
-            classes=[0],
-            conf=self.conf,
-            verbose=False,
-            tracker="bytetrack.yaml",
-            device=self.device,
-        )
+        with self._lock:
+            results = self.model.track(
+                frame,
+                persist=True,
+                classes=[0],
+                conf=self.conf,
+                verbose=False,
+                tracker="bytetrack.yaml",
+                device=self.device,
+            )
 
         current_frame_ids: set[int] = set()
 
