@@ -1,0 +1,1254 @@
+<requirements class="txt"></requirements><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ZONE COUNTER — People Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&family=Barlow+Condensed:wght@400;700;900&display=swap" rel="stylesheet"/>
+<style>
+  /* ── Reset & Base ──────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #080c10;
+    --bg2:        #0d1520;
+    --bg3:        #121e2d;
+    --border:     #1e3047;
+    --accent:     #00d4ff;
+    --accent2:    #ff6b00;
+    --accent3:    #00ff88;
+    --danger:     #ff3366;
+    --text:       #c8dce8;
+    --text-dim:   #4a6a82;
+    --text-bright:#ffffff;
+    --mono:       'Share Tech Mono', monospace;
+    --sans:       'Barlow', sans-serif;
+    --cond:       'Barlow Condensed', sans-serif;
+    --stat-h:     120px;
+    --panel-gap:  12px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    overflow: hidden;
+  }
+
+  /* ── Scanline overlay ─────────────────────────────────────── */
+  body::before {
+    content:'';
+    position:fixed; inset:0; pointer-events:none; z-index:9999;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,.07) 2px,
+      rgba(0,0,0,.07) 4px
+    );
+  }
+
+  /* ── Layout ─────────────────────────────────────────────────  */
+  #app {
+    display: grid;
+    grid-template-rows: 52px 1fr 44px;
+    grid-template-columns: 1fr 300px;
+    grid-template-areas:
+      "header  header"
+      "video   sidebar"
+      "footer  footer";
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────  */
+  #header {
+    grid-area: header;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 0 20px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  .logo {
+    font-family: var(--cond);
+    font-weight: 900;
+    font-size: 20px;
+    letter-spacing: 3px;
+    color: var(--text-bright);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--accent); }
+
+  .header-sep { width: 1px; height: 24px; background: var(--border); }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background .3s;
+    box-shadow: 0 0 0 0 transparent;
+  }
+  .status-dot.live {
+    background: var(--accent3);
+    animation: pulse-green 1.5s infinite;
+  }
+  .status-dot.warn { background: var(--accent2); }
+  @keyframes pulse-green {
+    0%,100%{ box-shadow: 0 0 0 0 rgba(0,255,136,.4); }
+    50%    { box-shadow: 0 0 0 6px rgba(0,255,136,0); }
+  }
+
+  #status-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  #clock {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────── */
+  .btn {
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    padding: 7px 16px;
+    border-radius: 3px;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #fff;
+    box-shadow: 0 0 16px rgba(0,212,255,.4);
+  }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: var(--danger);
+    color: #fff;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-warn {
+    background: var(--accent2);
+    color: #000;
+  }
+  .btn-warn:hover:not(:disabled) { filter: brightness(1.2); }
+
+  /* ── Video panel ──────────────────────────────────────────── */
+  #video-panel {
+    grid-area: video;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* Source toolbar */
+  #source-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #source-bar label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .source-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 5px 10px;
+    outline: none;
+    min-width: 0;
+  }
+  .source-input:focus { border-color: var(--accent); }
+  .source-input::placeholder { color: var(--text-dim); }
+
+  /* Canvas container */
+  #canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+    cursor: crosshair;
+  }
+
+  #video-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  #roi-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* let mouse events fall through for zone */
+  }
+
+  #canvas-overlay-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+  #canvas-overlay-msg svg { opacity: .25; }
+
+  /* Drawing hint */
+  #draw-hint {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(0,0,0,.7);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,212,255,.3);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .3s;
+    white-space: nowrap;
+  }
+  #draw-hint.visible { opacity: 1; }
+
+  /* Crosshair coordinate display */
+  #coord-display {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    background: rgba(0,0,0,.6);
+    padding: 2px 8px;
+    border-radius: 2px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+
+  /* ROI toolbar */
+  #roi-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #roi-bar label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  #roi-points-info {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent2);
+    min-width: 80px;
+  }
+
+  .roi-spacer { flex: 1; }
+
+  /* ── Sidebar ──────────────────────────────────────────────── */
+  #sidebar {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--bg2);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .panel-title {
+    font-family: var(--cond);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 14px 16px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Stat cards */
+  .stat-card {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: background .2s;
+  }
+  .stat-card:hover { background: var(--bg3); }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+
+  .stat-card.active::before  { background: var(--accent3); }
+  .stat-card.exited::before  { background: var(--accent2); }
+  .stat-card.unique::before  { background: var(--accent); }
+
+  .stat-label {
+    font-family: var(--cond);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .stat-icon { font-size: 14px; }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 48px;
+    line-height: 1;
+    font-weight: 400;
+    transition: color .3s;
+  }
+
+  .stat-card.active  .stat-value { color: var(--accent3); }
+  .stat-card.exited  .stat-value { color: var(--accent2); }
+  .stat-card.unique  .stat-value { color: var(--accent); }
+
+  .stat-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  /* Bump animation when number changes */
+  @keyframes bump {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
+  .stat-value.bump { animation: bump .25s ease-out; }
+
+  /* Info section */
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 16px;
+    border-bottom: 1px solid rgba(30,48,71,.5);
+  }
+  .info-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .info-val {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  /* Log */
+  #log-box {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .log-entry {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 2px 16px;
+    font-size: 11px;
+    animation: fadeIn .3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; } }
+
+  .log-time { font-family: var(--mono); color: var(--text-dim); font-size: 10px; white-space: nowrap; }
+  .log-msg  { color: var(--text); }
+  .log-entry.info  .log-msg { color: var(--accent); }
+  .log-entry.warn  .log-msg { color: var(--accent2); }
+  .log-entry.error .log-msg { color: var(--danger); }
+  .log-entry.ok    .log-msg { color: var(--accent3); }
+
+  /* ── Footer ───────────────────────────────────────────────── */
+  #footer {
+    grid-area: footer;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  #fps-counter { color: var(--accent); }
+  #frame-counter {}
+  .footer-spacer { flex: 1; }
+  #ws-status {}
+  #session-id { color: var(--text-dim); font-size: 10px; }
+
+  /* ── Scrollbar ──────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── File input hidden ────────────────────────────────────── */
+  #file-input { display: none; }
+
+  /* Grid corner decorations */
+  #canvas-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(0,212,255,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0;
+    transition: opacity .5s;
+  }
+  #canvas-wrap.draw-mode::after { opacity: 1; }
+
+  /* ── Login overlay ────────────────────────────────────────── */
+  #login-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 12, 16, 0.95);
+    backdrop-filter: blur(12px);
+  }
+  #login-overlay.hidden { display: none; }
+
+  .login-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 40px;
+    width: 380px;
+    text-align: center;
+    box-shadow: 0 0 60px rgba(0, 212, 255, 0.08);
+  }
+
+  .login-box .logo {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  .login-subtitle {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .login-box .source-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  .login-box .btn {
+    width: 100%;
+    padding: 11px;
+    font-size: 14px;
+  }
+
+  .login-error {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--danger);
+    margin-top: 12px;
+    min-height: 16px;
+  }
+
+  /* Auth indicator in header */
+  .auth-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent3);
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    border-radius: 3px;
+  }
+
+  #btn-logout {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    background: none;
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  #btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN OVERLAY ── -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="logo">Zone<span>Counter</span></div>
+    <div class="login-subtitle">Authenticate to continue</div>
+    <input id="api-key-input" class="source-input"
+           type="password" placeholder="Enter API key"
+           onkeydown="if(event.key==='Enter') doLogin()"/>
+    <button class="btn btn-primary" onclick="doLogin()">🔑 AUTHENTICATE</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- ── HEADER ── -->
+  <header id="header">
+    <div class="logo">Zone<span>Counter</span></div>
+    <div class="header-sep"></div>
+    <div class="status-dot" id="status-dot"></div>
+    <div id="status-label">OFFLINE</div>
+    <div class="header-right">
+      <span class="auth-badge" id="auth-badge">● AUTHENTICATED</span>
+      <button id="btn-logout" onclick="doLogout()">LOGOUT</button>
+      <div id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ── VIDEO PANEL ── -->
+  <section id="video-panel">
+
+    <!-- Source bar -->
+    <div id="source-bar">
+      <label>SOURCE</label>
+      <input id="source-input" class="source-input"
+             placeholder="video.mp4 or rtsp://..." type="text"/>
+      <button class="btn btn-ghost" onclick="triggerFileOpen()">📁 Browse</button>
+      <button class="btn btn-primary" id="btn-start" onclick="startStream()">▶ START</button>
+      <button class="btn btn-ghost" id="btn-restart" onclick="restartStream()" disabled>↺ RESTART</button>
+      <button class="btn btn-danger" id="btn-stop" onclick="stopStream()" disabled>■ STOP</button>
+    </div>
+
+    <!-- Canvas -->
+    <div id="canvas-wrap" id="canvas-wrap">
+      <canvas id="video-canvas"></canvas>
+      <canvas id="roi-canvas"></canvas>
+      <div id="coord-display">X:0 Y:0</div>
+      <div id="draw-hint">Click to add point • Right-click / Double-click to finish • ESC to cancel</div>
+      <div id="canvas-overlay-msg" id="overlay-msg">
+        <svg width="64" height="64" fill="none" viewBox="0 0 64 64">
+          <rect x="8" y="14" width="48" height="36" rx="3" stroke="#4a6a82" stroke-width="2"/>
+          <circle cx="32" cy="32" r="8" stroke="#4a6a82" stroke-width="2"/>
+          <line x1="32" y1="8" x2="32" y2="14" stroke="#4a6a82" stroke-width="2"/>
+          <line x1="56" y1="32" x2="64" y2="32" stroke="#4a6a82" stroke-width="2"/>
+        </svg>
+        <span>Load a video source to begin</span>
+      </div>
+    </div>
+
+    <!-- ROI bar -->
+    <div id="roi-bar">
+      <label>ROI POLYGON</label>
+      <span id="roi-points-info">0 points</span>
+      <div class="roi-spacer"></div>
+      <button class="btn btn-ghost" id="btn-draw" onclick="toggleDrawMode()">✏ DRAW ROI</button>
+      <button class="btn btn-primary" id="btn-apply-roi" onclick="applyRoi()" disabled>✓ APPLY</button>
+      <button class="btn btn-danger" id="btn-clear-roi" onclick="clearRoi()">✕ CLEAR</button>
+    </div>
+  </section>
+
+  <!-- ── SIDEBAR ── -->
+  <aside id="sidebar">
+    <div class="panel-title">Live Metrics</div>
+
+    <div class="stat-card active">
+      <div class="stat-label"><span class="stat-icon">●</span> Active in Zone</div>
+      <div class="stat-value" id="stat-active">0</div>
+      <div class="stat-sub">Currently inside ROI</div>
+    </div>
+
+    <div class="stat-card exited">
+      <div class="stat-label"><span class="stat-icon">↗</span> Exited Zone</div>
+      <div class="stat-value" id="stat-exited">0</div>
+      <div class="stat-sub">Entered then left</div>
+    </div>
+
+    <div class="stat-card unique">
+      <div class="stat-label"><span class="stat-icon">◈</span> Unique Total</div>
+      <div class="stat-value" id="stat-unique">0</div>
+      <div class="stat-sub">All unique visitors</div>
+    </div>
+
+    <div class="panel-title">Source Info</div>
+    <div class="info-row"><span class="info-key">Resolution</span><span class="info-val" id="info-res">—</span></div>
+    <div class="info-row"><span class="info-key">FPS</span>        <span class="info-val" id="info-fps">—</span></div>
+    <div class="info-row"><span class="info-key">Total Frames</span><span class="info-val" id="info-frames">—</span></div>
+    <div class="info-row"><span class="info-key">Device</span>     <span class="info-val" id="info-device">—</span></div>
+    <div class="info-row"><span class="info-key">Model</span>      <span class="info-val" id="info-model">—</span></div>
+    <div class="info-row"><span class="info-key">ROI Vertices</span><span class="info-val" id="info-roi">None</span></div>
+
+    <div class="panel-title">Event Log</div>
+    <div id="log-box"></div>
+  </aside>
+
+  <!-- ── FOOTER ── -->
+  <footer id="footer">
+    <span>ZONE COUNTER v2.0</span>
+    <span id="fps-counter">0 FPS</span>
+    <span id="frame-counter">FRAME 0</span>
+    <span id="session-id"></span>
+    <span class="footer-spacer"></span>
+    <span id="ws-status">WS: DISCONNECTED</span>
+  </footer>
+
+</div>
+
+<input type="file" id="file-input" accept="video/*" onchange="handleFileSelect(event)"/>
+
+<script>
+/* ── Auth State ──────────────────────────────────────────────────────────── */
+let sessionId = '';
+
+/* ── State ─────────────────────────────────────────────────────────────────── */
+let ws = null;
+let drawMode = false;
+let roiPoints = [];           // normalised [0‑1] coords
+let tempPoints = [];          // screen coords (canvas-relative) while drawing
+let mousePos = { x: 0, y: 0 };
+
+let frameCount = 0;
+let fpsTimer = Date.now();
+let lastStats = { active: 0, exited: 0, unique: 0 };
+
+const vCanvas = document.getElementById('video-canvas');
+const vCtx    = vCanvas.getContext('2d');
+const rCanvas = document.getElementById('roi-canvas');
+const rCtx    = rCanvas.getContext('2d');
+const wrap    = document.getElementById('canvas-wrap');
+
+/* ── Auth helpers ──────────────────────────────────────────────────────────── */
+function showLogin() {
+  document.getElementById('login-overlay').classList.remove('hidden');
+}
+
+function hideLogin() {
+  document.getElementById('login-overlay').classList.add('hidden');
+}
+
+async function doLogin() {
+  const key = document.getElementById('api-key-input').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!key) { errEl.textContent = 'Enter an API key'; return; }
+
+  try {
+    const res = await fetch('/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: key }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      errEl.textContent = data.detail || 'Authentication failed';
+      return;
+    }
+    // Cookie is set automatically by the backend via Set-Cookie header
+    hideLogin();
+    connectWS();
+    log('Authenticated successfully', 'ok');
+  } catch (err) {
+    errEl.textContent = 'Network error: ' + err.message;
+  }
+}
+
+async function doLogout() {
+  sessionId = '';
+  if (ws) { ws.close(); ws = null; }
+  
+  try {
+    await fetch('/api/logout', { method: 'POST' });
+  } catch(e) { console.error("Logout failed:", e); }
+  
+  showLogin();
+  log('Logged out', 'warn');
+}
+
+/** Attach auth header to fetch calls - obsolete with cookies but kept for compatibility */
+function authHeaders(extra = {}) {
+  return { ...extra };
+}
+
+/* ── Clock ─────────────────────────────────────────────────────────────────── */
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toTimeString().slice(0, 8);
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ── WebSocket ─────────────────────────────────────────────────────────────── */
+function connectWS() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => {
+    setWsStatus(true);
+    hideLogin(); // Hide login if we successfully connected
+    log('WebSocket connected', 'ok');
+  };
+
+  ws.onclose = (e) => {
+    setWsStatus(false);
+    setStreamingState(false);
+    if (e.code === 4001) {
+      log('Authentication rejected — please log in again', 'error');
+      showLogin();
+      return;
+    }
+    log('WebSocket disconnected', 'warn');
+    setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => log('WebSocket error', 'error');
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleMessage(msg);
+  };
+}
+
+
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'session':
+      sessionId = msg.session_id;
+      document.getElementById('session-id').textContent = 'SID: ' + sessionId.slice(0, 8);
+      log(`Session ${sessionId.slice(0, 8)} started`, 'info');
+      break;
+
+    case 'frame':
+      renderFrame(msg.frame);
+      updateStats(msg.stats);
+      frameCount++;
+      updateFPS();
+      updateFrameCounter();
+      break;
+
+    case 'end':
+      log('Stream ended — video finished', 'warn');
+      setStreamingState(false);
+      document.getElementById('btn-restart').disabled = false;
+      break;
+
+    case 'info':
+      updateSourceInfo(msg.data);
+      break;
+
+    case 'status':
+      log(msg.message, 'info');
+      break;
+
+    case 'error':
+      log('Error: ' + msg.message, 'error');
+      setStreamingState(false);
+      break;
+  }
+}
+
+function sendMsg(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify(obj));
+}
+
+/* ── Stream control ────────────────────────────────────────────────────────── */
+function startStream() {
+  const src = document.getElementById('source-input').value.trim();
+  if (!src) { log('No source specified', 'warn'); return; }
+  log(`Opening: ${src}`, 'info');
+  sendMsg({ type: 'start', source: src });
+  setStreamingState(true);
+}
+
+function stopStream() {
+  sendMsg({ type: 'stop' });
+  setStreamingState(false);
+  log('Stream stopped', 'warn');
+}
+
+function restartStream() {
+  sendMsg({ type: 'restart' });
+  setStreamingState(true);
+  frameCount = 0;
+  log('Stream restarted', 'info');
+}
+
+function setStreamingState(streaming) {
+  document.getElementById('btn-start').disabled   =  streaming;
+  document.getElementById('btn-stop').disabled    = !streaming;
+  document.getElementById('btn-restart').disabled = !streaming;
+
+  const dot   = document.getElementById('status-dot');
+  const label = document.getElementById('status-label');
+  if (streaming) {
+    dot.className   = 'status-dot live';
+    label.textContent = 'LIVE';
+  } else {
+    dot.className   = 'status-dot';
+    label.textContent = 'OFFLINE';
+  }
+
+  if (!streaming) {
+    // reset stats display
+    setStatVal('stat-active', 0);
+    setStatVal('stat-exited', 0);
+    setStatVal('stat-unique', 0);
+  }
+}
+
+/* ── File browse ───────────────────────────────────────────────────────────── */
+function triggerFileOpen() {
+  document.getElementById('file-input').click();
+}
+
+async function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  log(`Uploading ${file.name}…`, 'info');
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const res  = await fetch('/upload', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: form,
+    });
+    if (res.status === 401) { doLogout(); return; }
+    const data = await res.json();
+    document.getElementById('source-input').value = data.path;
+    log(`Uploaded → ${data.path}`, 'ok');
+  } catch (err) {
+    log('Upload failed: ' + err, 'error');
+  }
+  e.target.value = '';
+}
+
+/* ── Canvas / ROI drawing ──────────────────────────────────────────────────── */
+function resizeCanvases() {
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  vCanvas.width  = rCanvas.width  = w;
+  vCanvas.height = rCanvas.height = h;
+}
+
+window.addEventListener('resize', () => { resizeCanvases(); drawRoiOverlay(); });
+resizeCanvases();
+
+// Render frame from base64 JPEG
+const img = new Image();
+img.onload = () => {
+  vCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+  // Letterbox
+  const ar = img.width / img.height;
+  const cw = vCanvas.width, ch = vCanvas.height;
+  let dw = cw, dh = ch, dx = 0, dy = 0;
+  if (cw / ch > ar) { dw = ch * ar; dx = (cw - dw) / 2; }
+  else               { dh = cw / ar; dy = (ch - dh) / 2; }
+  vCtx.drawImage(img, dx, dy, dw, dh);
+
+  // Hide overlay message after first frame
+  document.getElementById('canvas-overlay-msg').style.display = 'none';
+};
+
+function renderFrame(b64) {
+  img.src = 'data:image/jpeg;base64,' + b64;
+}
+
+// ── Mouse interaction ────────────────────────────────
+wrap.addEventListener('mousemove', (e) => {
+  const r = wrap.getBoundingClientRect();
+  mousePos = { x: e.clientX - r.left, y: e.clientY - r.top };
+
+  if (drawMode) {
+    const c = document.getElementById('coord-display');
+    const n = toNormalised(mousePos.x, mousePos.y);
+    c.textContent = `X:${Math.round(mousePos.x)} Y:${Math.round(mousePos.y)}`;
+    c.style.opacity = '1';
+    drawRoiOverlay();
+  }
+});
+
+wrap.addEventListener('mouseleave', () => {
+  document.getElementById('coord-display').style.opacity = '0';
+  if (drawMode) drawRoiOverlay();
+});
+
+wrap.addEventListener('click', (e) => {
+  if (!drawMode) return;
+  const r = wrap.getBoundingClientRect();
+  const sx = e.clientX - r.left;
+  const sy = e.clientY - r.top;
+  tempPoints.push({ x: sx, y: sy });
+  updateRoiPointsInfo();
+  drawRoiOverlay();
+});
+
+wrap.addEventListener('dblclick', (e) => {
+  e.preventDefault();
+  if (!drawMode || tempPoints.length < 3) return;
+  finaliseRoi();
+});
+
+wrap.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (!drawMode) return;
+  if (tempPoints.length > 0) {
+    tempPoints.pop();
+    updateRoiPointsInfo();
+    drawRoiOverlay();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && drawMode) {
+    cancelDraw();
+  }
+  if ((e.key === 'Enter') && drawMode && tempPoints.length >= 3) {
+    finaliseRoi();
+  }
+});
+
+function toggleDrawMode() {
+  if (drawMode) {
+    cancelDraw();
+  } else {
+    drawMode = true;
+    tempPoints = [];
+    wrap.classList.add('draw-mode');
+    document.getElementById('draw-hint').classList.add('visible');
+    document.getElementById('btn-draw').textContent = '✕ CANCEL DRAW';
+    document.getElementById('btn-draw').classList.add('btn-danger');
+    document.getElementById('btn-draw').classList.remove('btn-ghost');
+    log('ROI draw mode active — click to place polygon vertices', 'info');
+  }
+}
+
+function cancelDraw() {
+  drawMode = false;
+  tempPoints = [];
+  wrap.classList.remove('draw-mode');
+  document.getElementById('draw-hint').classList.remove('visible');
+  document.getElementById('btn-draw').textContent = '✏ DRAW ROI';
+  document.getElementById('btn-draw').classList.remove('btn-danger');
+  document.getElementById('btn-draw').classList.add('btn-ghost');
+  document.getElementById('btn-apply-roi').disabled = roiPoints.length < 3;
+  drawRoiOverlay();
+}
+
+function finaliseRoi() {
+  if (tempPoints.length < 3) { log('Need at least 3 points', 'warn'); return; }
+  roiPoints = tempPoints.map(p => toNormalised(p.x, p.y));
+  cancelDraw();
+  drawRoiOverlay();
+  document.getElementById('btn-apply-roi').disabled = false;
+  updateRoiPointsInfo();
+  log(`ROI polygon ready (${roiPoints.length} pts) — click APPLY`, 'ok');
+}
+
+function applyRoi() {
+  if (roiPoints.length < 3) return;
+  sendMsg({ type: 'set_roi', points: roiPoints, space: 'normalised' });
+  document.getElementById('info-roi').textContent = roiPoints.length + ' vertices';
+  log(`ROI applied with ${roiPoints.length} vertices`, 'ok');
+}
+
+function clearRoi() {
+  roiPoints = [];
+  tempPoints = [];
+  drawMode = false;
+  wrap.classList.remove('draw-mode');
+  document.getElementById('draw-hint').classList.remove('visible');
+  document.getElementById('btn-draw').textContent = '✏ DRAW ROI';
+  document.getElementById('btn-draw').classList.remove('btn-danger');
+  document.getElementById('btn-draw').classList.add('btn-ghost');
+  document.getElementById('btn-apply-roi').disabled = true;
+  document.getElementById('info-roi').textContent = 'Full frame';
+  sendMsg({ type: 'clear_roi' });
+  drawRoiOverlay();
+  updateRoiPointsInfo();
+  log('ROI cleared — counting all detected people', 'warn');
+}
+
+function toNormalised(sx, sy) {
+  return [sx / wrap.clientWidth, sy / wrap.clientHeight];
+}
+
+function toScreen(nx, ny) {
+  return { x: nx * wrap.clientWidth, y: ny * wrap.clientHeight };
+}
+
+function drawRoiOverlay() {
+  const w = rCanvas.width, h = rCanvas.height;
+  rCtx.clearRect(0, 0, w, h);
+
+  // Draw committed ROI
+  if (roiPoints.length >= 3 && !drawMode) {
+    const pts = roiPoints.map(([nx, ny]) => toScreen(nx, ny));
+    rCtx.beginPath();
+    rCtx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => rCtx.lineTo(p.x, p.y));
+    rCtx.closePath();
+    rCtx.fillStyle   = 'rgba(0,212,255,0.08)';
+    rCtx.strokeStyle = 'rgba(0,212,255,0.8)';
+    rCtx.lineWidth   = 2;
+    rCtx.setLineDash([]);
+    rCtx.fill();
+    rCtx.stroke();
+    pts.forEach((p, i) => {
+      rCtx.beginPath();
+      rCtx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      rCtx.fillStyle = '#00d4ff';
+      rCtx.fill();
+      rCtx.fillStyle = '#000';
+      rCtx.font = '10px Share Tech Mono';
+      rCtx.textAlign = 'center';
+      rCtx.fillText(i + 1, p.x, p.y + 4);
+    });
+    return;
+  }
+
+  // Draw in-progress polygon
+  if (!drawMode || tempPoints.length === 0) return;
+
+  const pts = [...tempPoints, mousePos];
+  rCtx.beginPath();
+  rCtx.moveTo(pts[0].x, pts[0].y);
+  pts.slice(1).forEach(p => rCtx.lineTo(p.x, p.y));
+  if (tempPoints.length >= 3) {
+    rCtx.closePath();
+    rCtx.fillStyle = 'rgba(255,107,0,0.08)';
+    rCtx.fill();
+  }
+  rCtx.strokeStyle = 'rgba(255,107,0,0.9)';
+  rCtx.lineWidth   = 2;
+  rCtx.setLineDash([6, 3]);
+  rCtx.stroke();
+  rCtx.setLineDash([]);
+
+  // Dots
+  tempPoints.forEach((p, i) => {
+    rCtx.beginPath();
+    rCtx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    rCtx.fillStyle = '#ff6b00';
+    rCtx.fill();
+    rCtx.fillStyle = '#000';
+    rCtx.font = 'bold 10px Share Tech Mono';
+    rCtx.textAlign = 'center';
+    rCtx.fillText(i + 1, p.x, p.y + 4);
+  });
+
+  // Mouse cursor cross
+  rCtx.strokeStyle = 'rgba(255,107,0,0.6)';
+  rCtx.lineWidth = 1;
+  rCtx.setLineDash([3, 3]);
+  rCtx.beginPath();
+  rCtx.moveTo(mousePos.x, 0);
+  rCtx.lineTo(mousePos.x, h);
+  rCtx.moveTo(0, mousePos.y);
+  rCtx.lineTo(w, mousePos.y);
+  rCtx.stroke();
+  rCtx.setLineDash([]);
+}
+
+function updateRoiPointsInfo() {
+  const count = drawMode ? tempPoints.length : roiPoints.length;
+  document.getElementById('roi-points-info').textContent =
+    count + (count === 1 ? ' point' : ' points');
+}
+
+/* ── Stats ─────────────────────────────────────────────────────────────────── */
+function updateStats(s) {
+  setStatVal('stat-active', s.active);
+  setStatVal('stat-exited', s.exited);
+  setStatVal('stat-unique',  s.unique);
+  lastStats = s;
+}
+
+function setStatVal(id, val) {
+  const el = document.getElementById(id);
+  if (el.textContent !== String(val)) {
+    el.textContent = val;
+    el.classList.remove('bump');
+    void el.offsetWidth; // reflow
+    el.classList.add('bump');
+  }
+}
+
+function updateSourceInfo(data) {
+  if (data.width)        document.getElementById('info-res').textContent    = `${data.width}×${data.height}`;
+  if (data.fps)          document.getElementById('info-fps').textContent    = `${data.fps}`;
+  if (data.total_frames) document.getElementById('info-frames').textContent = data.total_frames;
+  if (data.device != null) {
+    const dev = data.device === 'cpu' ? 'CPU' : `GPU:${data.device}`;
+    document.getElementById('info-device').textContent = dev;
+  }
+  if (data.model)        document.getElementById('info-model').textContent  = data.model;
+}
+
+/* ── FPS & frame counter ────────────────────────────────────────────────────── */
+function updateFPS() {
+  const now = Date.now();
+  if (now - fpsTimer >= 1000) {
+    document.getElementById('fps-counter').textContent = frameCount + ' FPS';
+    frameCount = 0;
+    fpsTimer = now;
+  }
+}
+
+function updateFrameCounter() {
+  // We only track display frames, not decode frames
+}
+
+/* ── Log ────────────────────────────────────────────────────────────────────── */
+function log(msg, type = 'default') {
+  const box = document.getElementById('log-box');
+  const el  = document.createElement('div');
+  el.className = `log-entry ${type}`;
+  const t = new Date().toTimeString().slice(0, 8);
+  
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'log-time';
+  timeSpan.textContent = t;
+  
+  const msgSpan = document.createElement('span');
+  msgSpan.className = 'log-msg';
+  msgSpan.textContent = msg;
+  
+  el.appendChild(timeSpan);
+  el.appendChild(msgSpan);
+  
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+  // Max 100 entries
+  while (box.children.length > 100) box.removeChild(box.firstChild);
+}
+
+/* ── WS Status ───────────────────────────────────────────────────────────────── */
+function setWsStatus(connected) {
+  document.getElementById('ws-status').textContent =
+    connected ? 'WS: CONNECTED' : 'WS: DISCONNECTED';
+}
+
+/* ── Init ───────────────────────────────────────────────────────────────────── */
+if (authToken) {
+  hideLogin();
+  connectWS();
+  log('Restored session from saved token', 'info');
+} else {
+  showLogin();
+}
+log('System initialised — v2.0', 'info');
+</script>
+</body>
+</html>

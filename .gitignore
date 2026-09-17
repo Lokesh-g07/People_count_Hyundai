@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+factory_eye.db
+*.db
+uploads/
+test_out*.txt
+test_output.txt
+fail_trace.txt
