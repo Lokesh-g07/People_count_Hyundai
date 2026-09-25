@@ -44,19 +44,34 @@ FactoryEye is a high-performance computer vision backend that consumes RTSP came
 
 ## System Architecture
 
-```text
-Browser (WebSocket + REST)
-      │ (JWT Cookie Auth)
-      ▼
-main.py (FastAPI — WS /ws, POST /api/token, GET /export)
-      │
-      ▼
-people_counter.py (YOLOv8 tracking + ROI logic + thread locks)
-      │
-      ├──▶ ultralytics (YOLOv8n/s/m/l + ByteTrack)
-      │
-      ▼
-db.py (aiosqlite WAL mode persistence)
+```mermaid
+flowchart TD
+    %% Styling
+    classDef client fill:#0f1826,stroke:#00c8f0,stroke-width:2px,color:#e8f4ff
+    classDef api fill:#141f30,stroke:#ff7c2a,stroke-width:2px,color:#e8f4ff
+    classDef core fill:#1a2d44,stroke:#00e87a,stroke-width:2px,color:#e8f4ff
+    classDef db fill:#0a0f18,stroke:#a78bfa,stroke-width:2px,color:#e8f4ff
+
+    Client["💻 Web Client (Vanilla JS)"]:::client
+    Auth["🔐 auth.py (JWT + Rate Limits)"]:::api
+    Main["🚀 main.py (FastAPI App)"]:::api
+    API["🌐 routers/api.py (REST)"]:::api
+    WS["⚡ routers/ws.py (WebSockets)"]:::api
+    Val["🛡️ validation.py (SSRF Checks)"]:::api
+    Counter["👁️ people_counter.py (Vision Logic)"]:::core
+    YOLO["🧠 Ultralytics (YOLOv8 + ByteTrack)"]:::core
+    DB["💾 db.py (SQLite WAL Persistence)"]:::db
+
+    Client -- "Auth & REST" --> Main
+    Client -- "WS /ws (Live Frames)" <--> Main
+    Main --> Auth
+    Main --> API
+    Main --> WS
+    WS --> Val
+    WS -- "Spawn Session" --> Counter
+    Counter -- "Inference" --> YOLO
+    Counter -- "Dwell Metrics" --> DB
+    API -- "Fetch History" --> DB
 ```
 
 ## Technical Stack
@@ -172,12 +187,27 @@ FactoryEye behavior is heavily customizable via Environment Variables:
 ## Project Structure
 ```text
 PEOPLE_COUNT/
-├── main.py                 # FastAPI Application & WS Routers
-├── people_counter.py       # YOLOv8 Tracking & Vision Logic
+├── main.py                 # Slim FastAPI Application Entrypoint
+├── config.py               # Environment Variables & Configuration
+├── auth.py                 # JWT Authentication & Rate Limiting
+├── validation.py           # SSRF Protection & Upload Validation
+├── sessions.py             # Global Session State Management
+├── people_counter.py       # YOLOv8 Tracking & Vision Core Logic
 ├── db.py                   # Async SQLite Persistence
 ├── requirements.txt        # Python Dependencies
-├── frontend/
-│   └── index.html          # Vanilla JS/CSS Dashboard
+├── routers/                # FastAPI Routers
+│   ├── api.py              # REST API Routes (Upload, History, Models)
+│   └── ws.py               # WebSocket Video Streaming Handler
+├── frontend/               # Modularized Frontend Dashboard
+│   ├── index.html          # Clean HTML Layout
+│   ├── css/styles.css      # Design Tokens & Layout Styles
+│   └── js/
+│       ├── app.js          # App Initialization
+│       ├── controls.js     # Inputs & Stream Action Controls
+│       ├── roi.js          # Polygon Drawing Canvas Logic
+│       ├── state.js        # Global State Variables
+│       ├── ui.js           # Clock, Logs, Sparklines, Alerts
+│       └── websocket.js    # Client-side WS Communication
 ├── uploads/                # Sanitized temporary video uploads
 └── scratch/                # Test suites and mocks
 ```
